@@ -58,6 +58,11 @@ func CombineReducers(frs []FieldReducer) Reducer {
 	m := ReducerMap{}
 	m.Add(frs)
 
+	m2 := map[string]Reducer{}
+	for fieldname, reducers := range m {
+		m2[fieldname] = combineReducersArr(reducers...)
+	}
+
 	return func(state, action interface{}) (out interface{}) {
 
 		DBG(">>> combine state=", state, "; action=", action)
@@ -69,11 +74,10 @@ func CombineReducers(frs []FieldReducer) Reducer {
 		}
 		DBG("res=", res)
 
-		for fieldname, reducers := range m {
+		for fieldname, reducer := range m2 {
 			DBG("+fieldname=", fieldname)
 			fvalue := getFieldValue(state, fieldname)
 			DBG("fvalue=", fvalue)
-			reducer := combineReducersArr(reducers...)
 
 			state2 := reducer(fvalue, action)
 			if res2, ok := state2.(ReducerResult); ok {
