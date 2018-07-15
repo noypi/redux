@@ -1,9 +1,5 @@
 package redux
 
-import (
-	"reflect"
-)
-
 type Reducer func(state interface{}, action HasType) (newState interface{})
 
 func (fn Reducer) Combine(fn2 Reducer) Reducer {
@@ -16,6 +12,15 @@ func DefaultReducer(state interface{}, action HasType) (out interface{}) {
 	return state
 }
 
+func CombineReducersArr(a, a1 Reducer, as ...Reducer) Reducer {
+	r0 := a.Combine(a1)
+	for _, r := range as {
+		r0 = r0.Combine(r)
+	}
+
+	return r0
+}
+
 func combineReducersArr(as ...Reducer) Reducer {
 	if 1 == len(as) {
 		return as[0]
@@ -26,15 +31,6 @@ func combineReducersArr(as ...Reducer) Reducer {
 	}
 
 	return DefaultReducer
-}
-
-func CombineReducersArr(a, a1 Reducer, as ...Reducer) Reducer {
-	r0 := a.Combine(a1)
-	for _, r := range as {
-		r0 = r0.Combine(r)
-	}
-
-	return r0
 }
 
 type FieldReducer struct {
@@ -97,31 +93,4 @@ func CombineReducers(frs []FieldReducer) Reducer {
 
 		return
 	}
-}
-
-func getFieldValue(a interface{}, fieldname string) (b interface{}) {
-	v := reflect.ValueOf(a)
-	for v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-
-	if v.Kind() == reflect.Struct {
-		fv := v.FieldByName(fieldname)
-		DBG("getFieldValue a=", a, ", fieldname=", fieldname)
-		if fv.IsValid() {
-			b = fv.Interface()
-		} else {
-			b = ReducerResult{}
-		}
-	} else if v.Kind() == reflect.Map {
-		fv := v.MapIndex(reflect.ValueOf(fieldname))
-		bIsNil := (fv.Kind() == reflect.Ptr) && fv.IsNil()
-		if !bIsNil && fv.IsValid() {
-			b = fv.Interface()
-		} else {
-			b = ReducerResult{}
-		}
-	}
-	DBG("getFieldValue out=", b)
-	return
 }

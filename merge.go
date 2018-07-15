@@ -71,14 +71,3 @@ func Merge(a, b interface{}) (out interface{}) {
 
 	return
 }
-
-func isValidField(t reflect.Type, v reflect.Value) (bRet bool) {
-	if (t.Kind() == reflect.Ptr) && v.IsNil() {
-		return
-	}
-	if (t.Kind() == reflect.String) && (0 == v.Len()) {
-		return
-	}
-
-	return true
-}

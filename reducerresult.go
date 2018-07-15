@@ -90,27 +90,6 @@ func (this ReducerResult) ToType(refType interface{}) interface{} {
 	return out.Interface()
 }
 
-// copies assignable fields from b to a
-func copyProps(a, b reflect.Value) {
-	at, av := a.Type(), a
-	bt, bv := b.Type(), b
-	if (at.Kind() != reflect.Struct) || (bt.Kind() != reflect.Struct) {
-		return
-	}
-
-	for i := 0; i < at.NumField(); i++ {
-		fat := at.Field(i)
-		bat, has := bt.FieldByName(fat.Name)
-		if !has {
-			continue
-		}
-
-		if bat.Type.AssignableTo(fat.Type) {
-			av.Field(i).Set(bv.FieldByName(fat.Name))
-		}
-	}
-}
-
 func (this ReducerResult) CanFlattenTo(refType interface{}) (bRet bool) {
 	t0, ok := refType.(reflect.Type)
 	if !ok {
@@ -143,24 +122,6 @@ func (this ReducerResult) CanFlattenTo(refType interface{}) (bRet bool) {
 		if !ft.Type.AssignableTo(vt) && !canAssignFields(ft.Type, vt) {
 			DBG("canflatten was not assignable, ft.name=", ft.Name, "; ft typename=", ft.Type.Name(), "; v=", v)
 			DBG("ft.pkg=", ft.PkgPath)
-			return
-		}
-	}
-
-	return true
-}
-
-func canAssignFields(a, b reflect.Type) (bRet bool) {
-	if a.NumField() < b.NumField() {
-		return
-	}
-	for i := 0; i < b.NumField(); i++ {
-		fb := b.Field(i)
-		fa, has := a.FieldByName(fb.Name)
-		if !has {
-			return
-		}
-		if !fb.Type.AssignableTo(fa.Type) {
 			return
 		}
 	}
