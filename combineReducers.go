@@ -1,14 +1,14 @@
 package redux
 
-type Reducer func(state interface{}, action HasType) (newState interface{})
+type Reducer func(state, action interface{}) (newState interface{})
 
 func (fn Reducer) Combine(fn2 Reducer) Reducer {
-	return func(state interface{}, action HasType) interface{} {
+	return func(state, action interface{}) interface{} {
 		return fn2(fn(state, action), action)
 	}
 }
 
-func DefaultReducer(state interface{}, action HasType) (out interface{}) {
+func DefaultReducer(state, action interface{}) (out interface{}) {
 	return state
 }
 
@@ -58,7 +58,7 @@ func CombineReducers(frs []FieldReducer) Reducer {
 	m := ReducerMap{}
 	m.Add(frs)
 
-	return func(state interface{}, action HasType) (out interface{}) {
+	return func(state, action interface{}) (out interface{}) {
 
 		DBG(">>> combine state=", state, "; action=", action)
 		res := ReducerResult{}

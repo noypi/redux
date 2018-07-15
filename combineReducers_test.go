@@ -8,11 +8,6 @@ import (
 	assertpkg "github.com/stretchr/testify/assert"
 )
 
-const (
-	TYPE1 redux.Type = iota
-	TYPE2
-)
-
 func init() {
 	redux.EnableDebugging()
 }
@@ -29,7 +24,6 @@ func TestCombineReducers_x01(t *testing.T) {
 		FieldOne string
 	}
 	type ActionA struct {
-		redux.Type
 		Payload PayloadOne
 	}
 
@@ -37,18 +31,17 @@ func TestCombineReducers_x01(t *testing.T) {
 		FieldTwo string
 	}
 	type ActionB struct {
-		redux.Type
 		Payload PayloadTwo
 	}
 
 	reducer1 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldOne", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "FieldOne", Reducer: func(state, action interface{}) interface{} {
 			if _, ok := action.(ActionA); !ok {
 				return state
 			}
 			return redux.Merge(state, action.(ActionA).Payload)
 		}},
-		{Name: "FieldTwo", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "FieldTwo", Reducer: func(state, action interface{}) interface{} {
 			if _, ok := action.(ActionB); !ok {
 				return state
 			}
@@ -56,21 +49,21 @@ func TestCombineReducers_x01(t *testing.T) {
 		}},
 	})
 
-	newState := reducer1(StateA{}, ActionA{Type: TYPE1, Payload: PayloadOne{"New Field One"}})
+	newState := reducer1(StateA{}, ActionA{Payload: PayloadOne{"New Field One"}})
 	v, ok := newState.(StateA)
 	assert.True(ok)
 	assert.Equal("New Field One", v.FieldOne, "newState=%v", newState)
 	assert.Equal("", v.FieldTwo)
 
 	reducer2 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldTwo", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "FieldTwo", Reducer: func(state, action interface{}) interface{} {
 			return redux.Merge(state, action.(ActionB).Payload)
 		}},
 	})
 
 	log.Println("------- trying reducer2")
 
-	newState = reducer2(newState, ActionB{Type: TYPE1, Payload: PayloadTwo{"Second try"}})
+	newState = reducer2(newState, ActionB{Payload: PayloadTwo{"Second try"}})
 	v, ok = newState.(StateA)
 	assert.True(ok)
 	assert.Equal("New Field One", v.FieldOne, "newState=%v", newState)
@@ -95,22 +88,21 @@ func TestCombineReducers_withNewProperty(t *testing.T) {
 		}
 	}
 	type ActionA struct {
-		redux.Type
 		Payload PayloadOne
 	}
 
 	reducer1 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldOne", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "FieldOne", Reducer: func(state, action interface{}) interface{} {
 			return redux.Merge(state, action.(ActionA).Payload)
 		}},
-		{Name: "SomeNewProperty", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "SomeNewProperty", Reducer: func(state, action interface{}) interface{} {
 			extendedAction := action.(ActionA)
 			extendedAction.Payload.SomeNewProperty += " Appended Value"
 			return redux.Merge(state, extendedAction.Payload)
 		}},
 	})
 
-	newState := reducer1(StateA{}, ActionA{0, PayloadOne{"New Field One", "unknown"}})
+	newState := reducer1(StateA{}, ActionA{PayloadOne{"New Field One", "unknown"}})
 	v, ok := newState.(redux.ReducerResult)
 	assert.True(ok)
 	assert.Equal(2, len(v))
@@ -148,20 +140,17 @@ func TestCombineReducers_withSubField(t *testing.T) {
 		}
 	}
 	type ActionA struct {
-		redux.Type
 		Payload PayloadOne
 	}
 	type ActionUpdatePhone struct {
-		redux.Type
 		Payload PayloadUpdatePhone
 	}
 
 	type ActionSub struct {
-		redux.Type
 		Payload PayloadUpdateSub
 	}
 
-	subReducer := func(state interface{}, action redux.HasType) interface{} {
+	subReducer := func(state, action interface{}) interface{} {
 		extendedAction, ok := action.(ActionSub)
 		if !ok {
 			return state
@@ -171,7 +160,7 @@ func TestCombineReducers_withSubField(t *testing.T) {
 		return redux.Merge(state, extendedAction.Payload)
 	}
 
-	subReducerPhone := func(state interface{}, action redux.HasType) interface{} {
+	subReducerPhone := func(state, action interface{}) interface{} {
 		extendedAction, ok := action.(ActionUpdatePhone)
 		if !ok {
 			return state
@@ -181,13 +170,13 @@ func TestCombineReducers_withSubField(t *testing.T) {
 	}
 
 	reducer1 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldOne", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "FieldOne", Reducer: func(state, action interface{}) interface{} {
 			if _, ok := action.(ActionA); !ok {
 				return state
 			}
 			return redux.Merge(state, action.(ActionA).Payload)
 		}},
-		{Name: "Sub", Reducer: func(state interface{}, action redux.HasType) interface{} {
+		{Name: "Sub", Reducer: func(state, action interface{}) interface{} {
 			if _, ok := action.(ActionUpdatePhone); !ok {
 				return state
 			}
@@ -199,12 +188,12 @@ func TestCombineReducers_withSubField(t *testing.T) {
 		})},
 	})
 
-	state0 := reducer1(StateA{}, ActionA{0, PayloadOne{FieldOne: "my field one"}})
+	state0 := reducer1(StateA{}, ActionA{PayloadOne{FieldOne: "my field one"}})
 
 	log.Println("-------------- test1")
 	updatePhone := PayloadUpdatePhone{}
 	updatePhone.Sub.Phone = "phone1234"
-	newState := reducer1(state0, ActionUpdatePhone{0, updatePhone})
+	newState := reducer1(state0, ActionUpdatePhone{updatePhone})
 	log.Printf("newstate %t: %v", newState, newState)
 	v, ok := newState.(StateA)
 	log.Println("v=", v)
