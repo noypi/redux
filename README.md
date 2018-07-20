@@ -1,2 +1,1 @@
-# redux
-redux for golang
+# under construction
