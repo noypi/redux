@@ -68,7 +68,7 @@ type reducerInfo struct {
 	Taction reflect.Type
 }
 
-var tnil = reflect.TypeOf(nil)
+var tinterface = reflect.TypeOf(func(a interface{}) {}).In(0)
 
 func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out interface{})) {
 	byType := map[reflect.Type]map[string]*reducerInfo{}
@@ -99,7 +99,9 @@ func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out
 		taction := reflect.TypeOf(action)
 		byString, has := byType[taction]
 		if !has {
-			if byString, has = byType[tnil]; !has {
+			DBGf("taction is not found, taction: %v", taction)
+			if byString, has = byType[tinterface]; !has {
+				DBG("still not found in tinterface")
 				return state
 			}
 		}
@@ -114,9 +116,11 @@ func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out
 		vaction := reflect.ValueOf(action)
 
 		for fieldname, info := range byString {
+			DBGf("state:%v, fieldname:%v", state, fieldname)
 			vfield := getVField(state, fieldname)
 
 			if (info.Tstate.Kind() == reflect.Interface) || (vfield.Type() == info.Tstate) {
+				DBGf("executing f=%v", info.T)
 				vres := info.V.Call([]reflect.Value{vfield, vaction})
 				state2 := vres[0].Interface()
 
@@ -127,8 +131,8 @@ func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out
 				}
 
 			} else {
-				DBGf("ignoring reducer: %v, because vfield is not same vfield: %v",
-					info.T, vfield.Type())
+				DBGf("ignoring reducer: %v, because vfield is not same vfield: %v, state:%v, ",
+					info.T, vfield.Type(), reflect.TypeOf(state))
 			}
 		}
 

@@ -91,6 +91,7 @@ func TestCombineReducers_withNewProperty(t *testing.T) {
 		},
 		"SomeNewProperty": func(state interface{}, action ActionA) interface{} {
 			action.Payload.SomeNewProperty += " Appended Value"
+			redux.DBG("trying to merge from SomeNewProperty")
 			return redux.Merge(state, action.Payload)
 		},
 	})
@@ -143,14 +144,14 @@ func TestCombineReducers_withSubField(t *testing.T) {
 		Payload PayloadUpdateSub
 	}
 
-	subReducerAddress := func(state SubField, action ActionUpdateAddress) interface{} {
-		state.Address += " Before Address Append"
+	subReducerAddress := func(state string, action ActionUpdateAddress) interface{} {
+		state += " Before Address Append"
 		action.Payload.Sub.Address += " Appended Address"
 		return redux.Merge(state, action.Payload)
 	}
 
-	subReducerPhone := func(state SubField, action ActionUpdatePhone) interface{} {
-		state.Phone += " Before Phone Append"
+	subReducerPhone := func(state string, action ActionUpdatePhone) interface{} {
+		state += " Before Phone Append"
 		action.Payload.Sub.Phone += " Appended Phone"
 		return redux.Merge(state, action.Payload)
 	}
@@ -189,10 +190,10 @@ func TestCombineReducers_withSubField(t *testing.T) {
 	newState = reducer1(StateA{}, actionAddress)
 	v, ok = newState.(StateA)
 	assert.True(ok, "newState=%t: %v", newState, newState)
-	assert.Equal("Before Address Append some address sub Appended Sub Value", v.Sub.Address)
+	assert.Equal("some address sub Appended Address", v.Sub.Address)
 
 	newState = reducer1(StateA{}, actionPhone)
 	v, ok = newState.(StateA)
 	assert.True(ok, "newState=%t: %v", newState, newState)
-	assert.Equal("Before Phone Append sub phone1234 Appended Sub Value", v.Sub.Phone)
+	assert.Equal("sub phone1234 Appended Phone", v.Sub.Phone)
 }
