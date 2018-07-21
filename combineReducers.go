@@ -1,5 +1,10 @@
 package redux
 
+import (
+	"fmt"
+	"reflect"
+)
+
 type Reducer func(state, action interface{}) (newState interface{})
 
 func (fn Reducer) Combine(fn2 Reducer) Reducer {
@@ -40,12 +45,13 @@ type FieldReducer struct {
 
 type ReducersList []Reducer
 
-type ReducerMap map[string]ReducersList
+type ReducerMap map[string]interface{}
 
 func (this ReducersList) Append(fr FieldReducer) (ls ReducersList) {
 	return append(this, fr.Reducer)
 }
 
+/*
 func (this ReducerMap) Add(frs []FieldReducer) {
 	for _, fr := range frs {
 		ls, _ := this[fr.Name]
@@ -53,8 +59,91 @@ func (this ReducerMap) Add(frs []FieldReducer) {
 		this[fr.Name] = ls
 	}
 }
+*/
+type reducerInfo struct {
+	T reflect.Type
+	V reflect.Value
 
-func CombineReducers(frs []FieldReducer) Reducer {
+	Tstate  reflect.Type
+	Taction reflect.Type
+}
+
+var tnil = reflect.TypeOf(nil)
+
+func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out interface{})) {
+	byType := map[reflect.Type]map[string]*reducerInfo{}
+	for k, r := range m {
+		info := &reducerInfo{T: reflect.TypeOf(r)}
+		bValid := (info.T.Kind() == reflect.Func) &&
+			(2 == info.T.NumIn()) &&
+			(1 == info.T.NumOut())
+		if !bValid {
+			msgfmt := "Invalid reducer: '%v', should be in the form: 'func(state, action) (out)'." +
+				"  A redux reducer is a func with 2 arguments."
+			panic(fmt.Sprintf(msgfmt, info))
+		}
+		info.Tstate = info.T.In(0)
+		info.Taction = info.T.In(1)
+		info.V = reflect.ValueOf(r)
+
+		byString, has := byType[info.Taction]
+		if !has {
+			byString = map[string]*reducerInfo{}
+			byType[info.Taction] = byString
+		}
+		byString[k] = info
+	}
+
+	return func(state, action interface{}) (out interface{}) {
+		DBG(">>> combine state=", state, "; action=", action)
+		taction := reflect.TypeOf(action)
+		byString, has := byType[taction]
+		if !has {
+			if byString, has = byType[tnil]; !has {
+				return state
+			}
+		}
+
+		res := ReducerResult{}
+		if stateres, ok := state.(ReducerResult); ok {
+			res = res.Merge(stateres)
+		} else {
+			res.init(state)
+		}
+
+		vaction := reflect.ValueOf(action)
+
+		for fieldname, info := range byString {
+			vfield := getVField(state, fieldname)
+
+			if (info.Tstate.Kind() == reflect.Interface) || (vfield.Type() == info.Tstate) {
+				vres := info.V.Call([]reflect.Value{vfield, vaction})
+				state2 := vres[0].Interface()
+
+				if res2, ok := state2.(ReducerResult); ok {
+					res = res.Merge(res2)
+				} else {
+					res[fieldname] = state2
+				}
+
+			} else {
+				DBGf("ignoring reducer: %v, because vfield is not same vfield: %v",
+					info.T, vfield.Type())
+			}
+		}
+
+		out = res
+		if res.CanFlattenTo(state) {
+			out = res.ToType(state)
+		}
+
+		DBG("<<< combine out=", out)
+		return
+	}
+}
+
+/*
+func CombineReducers2(frs []FieldReducer) Reducer {
 	m := ReducerMap{}
 	m.Add(frs)
 
@@ -98,3 +187,4 @@ func CombineReducers(frs []FieldReducer) Reducer {
 		return
 	}
 }
+*/

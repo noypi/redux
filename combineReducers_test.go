@@ -34,19 +34,13 @@ func TestCombineReducers_x01(t *testing.T) {
 		Payload PayloadTwo
 	}
 
-	reducer1 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldOne", Reducer: func(state, action interface{}) interface{} {
-			if _, ok := action.(ActionA); !ok {
-				return state
-			}
-			return redux.Merge(state, action.(ActionA).Payload)
-		}},
-		{Name: "FieldTwo", Reducer: func(state, action interface{}) interface{} {
-			if _, ok := action.(ActionB); !ok {
-				return state
-			}
-			return redux.Merge(state, action.(ActionB).Payload)
-		}},
+	reducer1 := redux.CombineReducers(redux.ReducerMap{
+		"FieldOne": func(state interface{}, action ActionA) interface{} {
+			return redux.Merge(state, action.Payload)
+		},
+		"FieldTwo": func(state interface{}, action ActionB) interface{} {
+			return redux.Merge(state, action.Payload)
+		},
 	})
 
 	newState := reducer1(StateA{}, ActionA{Payload: PayloadOne{"New Field One"}})
@@ -55,10 +49,10 @@ func TestCombineReducers_x01(t *testing.T) {
 	assert.Equal("New Field One", v.FieldOne, "newState=%v", newState)
 	assert.Equal("", v.FieldTwo)
 
-	reducer2 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldTwo", Reducer: func(state, action interface{}) interface{} {
-			return redux.Merge(state, action.(ActionB).Payload)
-		}},
+	reducer2 := redux.CombineReducers(redux.ReducerMap{
+		"FieldTwo": func(state interface{}, action ActionB) interface{} {
+			return redux.Merge(state, action.Payload)
+		},
 	})
 
 	log.Println("------- trying reducer2")
@@ -91,15 +85,14 @@ func TestCombineReducers_withNewProperty(t *testing.T) {
 		Payload PayloadOne
 	}
 
-	reducer1 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldOne", Reducer: func(state, action interface{}) interface{} {
-			return redux.Merge(state, action.(ActionA).Payload)
-		}},
-		{Name: "SomeNewProperty", Reducer: func(state, action interface{}) interface{} {
-			extendedAction := action.(ActionA)
-			extendedAction.Payload.SomeNewProperty += " Appended Value"
-			return redux.Merge(state, extendedAction.Payload)
-		}},
+	reducer1 := redux.CombineReducers(redux.ReducerMap{
+		"FieldOne": func(state interface{}, action ActionA) interface{} {
+			return redux.Merge(state, action.Payload)
+		},
+		"SomeNewProperty": func(state interface{}, action ActionA) interface{} {
+			action.Payload.SomeNewProperty += " Appended Value"
+			return redux.Merge(state, action.Payload)
+		},
 	})
 
 	newState := reducer1(StateA{}, ActionA{PayloadOne{"New Field One", "unknown"}})
@@ -146,46 +139,30 @@ func TestCombineReducers_withSubField(t *testing.T) {
 		Payload PayloadUpdatePhone
 	}
 
-	type ActionSub struct {
+	type ActionUpdateAddress struct {
 		Payload PayloadUpdateSub
 	}
 
-	subReducer := func(state, action interface{}) interface{} {
-		extendedAction, ok := action.(ActionSub)
-		if !ok {
-			return state
-		}
-		extendedAction.Payload.Sub.Phone += " Appended Value"
-		extendedAction.Payload.Sub.Address += " Appended Value"
-		return redux.Merge(state, extendedAction.Payload)
+	subReducerAddress := func(state SubField, action ActionUpdateAddress) interface{} {
+		state.Address += " Before Address Append"
+		action.Payload.Sub.Address += " Appended Address"
+		return redux.Merge(state, action.Payload)
 	}
 
-	subReducerPhone := func(state, action interface{}) interface{} {
-		extendedAction, ok := action.(ActionUpdatePhone)
-		if !ok {
-			return state
-		}
-		extendedAction.Payload.Sub.Phone += " Appended Phone"
-		return redux.Merge(state, extendedAction.Payload)
+	subReducerPhone := func(state SubField, action ActionUpdatePhone) interface{} {
+		state.Phone += " Before Phone Append"
+		action.Payload.Sub.Phone += " Appended Phone"
+		return redux.Merge(state, action.Payload)
 	}
 
-	reducer1 := redux.CombineReducers([]redux.FieldReducer{
-		{Name: "FieldOne", Reducer: func(state, action interface{}) interface{} {
-			if _, ok := action.(ActionA); !ok {
-				return state
-			}
-			return redux.Merge(state, action.(ActionA).Payload)
-		}},
-		{Name: "Sub", Reducer: func(state, action interface{}) interface{} {
-			if _, ok := action.(ActionUpdatePhone); !ok {
-				return state
-			}
-			return redux.Merge(state, action.(ActionUpdatePhone).Payload)
-		}},
-		{Name: "Sub", Reducer: subReducer},
-		{Name: "Sub", Reducer: redux.CombineReducers([]redux.FieldReducer{
-			{Name: "Phone", Reducer: subReducerPhone},
-		})},
+	reducer1 := redux.CombineReducers(redux.ReducerMap{
+		"FieldOne": func(state interface{}, action ActionA) interface{} {
+			return redux.Merge(state, action.Payload)
+		},
+		"Sub": redux.CombineReducers(redux.ReducerMap{
+			"Phone":   subReducerPhone,
+			"Address": subReducerAddress,
+		}),
 	})
 
 	state0 := reducer1(StateA{}, ActionA{PayloadOne{FieldOne: "my field one"}})
@@ -203,12 +180,19 @@ func TestCombineReducers_withSubField(t *testing.T) {
 	assert.Equal("phone1234 Appended Phone", v.Sub.Phone)
 
 	log.Println("-------------- test2")
-	actionSub := ActionSub{}
-	actionSub.Payload.Sub.Phone = "sub phone1234"
-	actionSub.Payload.Sub.Address = "some address sub"
-	newState = reducer1(StateA{}, actionSub)
+	actionAddress := ActionUpdateAddress{}
+	actionAddress.Payload.Sub.Address = "some address sub"
+
+	actionPhone := ActionUpdatePhone{}
+	actionPhone.Payload.Sub.Phone = "sub phone1234"
+
+	newState = reducer1(StateA{}, actionAddress)
 	v, ok = newState.(StateA)
 	assert.True(ok, "newState=%t: %v", newState, newState)
-	assert.Equal("sub phone1234 Appended Value", v.Sub.Phone)
-	assert.Equal("some address sub Appended Value", v.Sub.Address)
+	assert.Equal("Before Address Append some address sub Appended Sub Value", v.Sub.Address)
+
+	newState = reducer1(StateA{}, actionPhone)
+	v, ok = newState.(StateA)
+	assert.True(ok, "newState=%t: %v", newState, newState)
+	assert.Equal("Before Phone Append sub phone1234 Appended Sub Value", v.Sub.Phone)
 }

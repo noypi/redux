@@ -15,3 +15,9 @@ func DBG(as ...interface{}) {
 		log.Println(as...)
 	}
 }
+
+func DBGf(fmt string, as ...interface{}) {
+	if g_enabledebugging {
+		log.Printf(fmt, as...)
+	}
+}

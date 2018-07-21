@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+
+	. "github.com/noypi/util/reflect"
 )
 
 type ReducerResult map[string]interface{}
@@ -62,71 +64,11 @@ func (this ReducerResult) AddMergeField(b ReducerResult, fieldname string) {
 }
 
 func (this ReducerResult) ToType(refType interface{}) interface{} {
-	t, ok := refType.(reflect.Type)
-	if !ok {
-		t = reflect.TypeOf(refType)
-	}
-
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	out := reflect.New(t).Elem()
-
-	for k, v := range this {
-		if nil == v {
-			continue
-		}
-		fvout := out.FieldByName(k)
-		fv := reflect.ValueOf(v)
-
-		if fv.Type().AssignableTo(fvout.Type()) {
-			fvout.Set(fv)
-		} else {
-			copyProps(fvout, fv)
-		}
-	}
-
-	return out.Interface()
+	return FlattenToType(this, refType)
 }
 
 func (this ReducerResult) CanFlattenTo(refType interface{}) (bRet bool) {
-	t0, ok := refType.(reflect.Type)
-	if !ok {
-		t0 = reflect.TypeOf(refType)
-	}
-
-	t := t0
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	if t.Kind() != reflect.Struct {
-		return
-	}
-
-	if t.NumField() < len(this) {
-		DBG("reftype numfield is lesser than ReducerResult, reftype=", t.Name(), "; reducerresult=", this)
-		return
-	}
-
-	for k, v := range this {
-		if nil == v {
-			continue
-		}
-		ft, has := t0.FieldByName(k)
-		if !has {
-			return
-		}
-		vt := reflect.TypeOf(v)
-		if !ft.Type.AssignableTo(vt) && !canAssignFields(ft.Type, vt) {
-			DBG("canflatten was not assignable, ft.name=", ft.Name, "; ft typename=", ft.Type.Name(), "; v=", v)
-			DBG("ft.pkg=", ft.PkgPath)
-			return
-		}
-	}
-
-	return true
+	return CanFlattenTo(this, refType)
 }
 
 func (this ReducerResult) Has(k string) bool {
