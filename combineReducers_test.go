@@ -85,16 +85,16 @@ func TestCombineReducers_withNewProperty(t *testing.T) {
 		Payload PayloadOne
 	}
 
-	reducer1 := redux.CombineReducers(redux.ReducerMap{
-		"FieldOne": func(state interface{}, action ActionA) interface{} {
+	reducer1 := redux.CombineReducers(
+		func(state interface{}, action ActionA) interface{} {
 			return redux.Merge(state, action.Payload)
 		},
-		"SomeNewProperty": func(state interface{}, action ActionA) interface{} {
+		func(state interface{}, action ActionA) interface{} {
 			action.Payload.SomeNewProperty += " Appended Value"
 			redux.DBG("trying to merge from SomeNewProperty")
 			return redux.Merge(state, action.Payload)
 		},
-	})
+	)
 
 	newState := reducer1(StateA{}, ActionA{PayloadOne{"New Field One", "unknown"}})
 	v, ok := newState.(redux.ReducerResult)

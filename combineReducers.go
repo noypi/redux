@@ -102,10 +102,11 @@ func combineMap(m map[string]interface{}) (reducer func(state, action interface{
 		vaction := reflect.ValueOf(action)
 
 		for fieldname, info := range byString {
-			DBGf("state:%v, fieldname:%v", state, fieldname)
 			vfield := getVField(state, fieldname)
+			tfield := vfield.Type()
+			DBGf("state:%v, fieldname:%v, state type:%v", state, fieldname, tfield)
 
-			if (info.Tstate.Kind() == reflect.Interface) || (vfield.Type() == info.Tstate) {
+			if (info.Tstate.Kind() == reflect.Interface) || (tfield == info.Tstate) {
 				DBGf("executing f=%v", info.T)
 				vres := info.V.Call([]reflect.Value{vfield, vaction})
 				state2 := vres[0].Interface()
