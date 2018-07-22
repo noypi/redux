@@ -5,61 +5,25 @@ import (
 	"reflect"
 )
 
-type Reducer func(state, action interface{}) (newState interface{})
-
-func (fn Reducer) Combine(fn2 Reducer) Reducer {
-	return func(state, action interface{}) interface{} {
-		return fn2(fn(state, action), action)
-	}
-}
-
-func DefaultReducer(state, action interface{}) (out interface{}) {
-	return state
-}
-
-func CombineReducersArr(a, a1 Reducer, as ...Reducer) Reducer {
-	r0 := a.Combine(a1)
-	for _, r := range as {
-		r0 = r0.Combine(r)
-	}
-
-	return r0
-}
-
-func combineReducersArr(as ...Reducer) Reducer {
-	if 1 == len(as) {
-		return as[0]
-	} else if 2 == len(as) {
-		return CombineReducersArr(as[0], as[1])
-	} else if 2 < len(as) {
-		return CombineReducersArr(as[0], as[1], as[2:]...)
-	}
-
-	return DefaultReducer
-}
-
-type FieldReducer struct {
-	Name    string
-	Reducer Reducer
-}
-
-type ReducersList []Reducer
-
 type ReducerMap map[string]interface{}
 
-func (this ReducersList) Append(fr FieldReducer) (ls ReducersList) {
-	return append(this, fr.Reducer)
+func CombineReducers(fs ...interface{}) (reducer func(state, action interface{}) (out interface{})) {
+	for i, o := range fs {
+		t := reflect.TypeOf(o)
+
+		switch t.Kind() {
+		case reflect.Map:
+			assertValidMap(t)
+			fs[i] = combineMap(castToMap(o))
+		case reflect.Func:
+			assertValidReducer(t)
+		}
+	}
+
+	return combineReducerArr(fs...)
+
 }
 
-/*
-func (this ReducerMap) Add(frs []FieldReducer) {
-	for _, fr := range frs {
-		ls, _ := this[fr.Name]
-		ls = ls.Append(fr)
-		this[fr.Name] = ls
-	}
-}
-*/
 type reducerInfo struct {
 	T reflect.Type
 	V reflect.Value
@@ -68,20 +32,40 @@ type reducerInfo struct {
 	Taction reflect.Type
 }
 
-var tinterface = reflect.TypeOf(func(a interface{}) {}).In(0)
+var g_tinterface = reflect.TypeOf(func(a interface{}) {}).In(0)
+var g_tmap = reflect.TypeOf(map[string]interface{}{})
 
-func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out interface{})) {
+func combineReducerArr(fs ...interface{}) func(state, action interface{}) (out interface{}) {
+	vfs := make([]reflect.Value, len(fs))
+	for i, fn := range fs {
+		vfs[i] = reflect.ValueOf(fn)
+	}
+	return func(state, action interface{}) (out interface{}) {
+		var res []reflect.Value
+		vaction := reflect.ValueOf(action)
+		for i, vfn := range vfs {
+			if 0 == i {
+				res = vfn.Call([]reflect.Value{reflect.ValueOf(state), vaction})
+			} else {
+				res = vfn.Call([]reflect.Value{res[0], vaction})
+			}
+		}
+
+		if 0 < len(res) {
+			out = res[0].Interface()
+		} else {
+			out = state
+		}
+		return
+	}
+}
+
+func combineMap(m map[string]interface{}) (reducer func(state, action interface{}) (out interface{})) {
 	byType := map[reflect.Type]map[string]*reducerInfo{}
 	for k, r := range m {
 		info := &reducerInfo{T: reflect.TypeOf(r)}
-		bValid := (info.T.Kind() == reflect.Func) &&
-			(2 == info.T.NumIn()) &&
-			(1 == info.T.NumOut())
-		if !bValid {
-			msgfmt := "Invalid reducer: '%v', should be in the form: 'func(state, action) (out)'." +
-				"  A redux reducer is a func with 2 arguments."
-			panic(fmt.Sprintf(msgfmt, info))
-		}
+		assertValidReducer(info.T)
+
 		info.Tstate = info.T.In(0)
 		info.Taction = info.T.In(1)
 		info.V = reflect.ValueOf(r)
@@ -100,7 +84,7 @@ func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out
 		byString, has := byType[taction]
 		if !has {
 			DBGf("taction is not found, taction: %v", taction)
-			if byString, has = byType[tinterface]; !has {
+			if byString, has = byType[g_tinterface]; !has {
 				DBG("still not found in tinterface")
 				return state
 			}
@@ -146,49 +130,34 @@ func CombineReducers(m ReducerMap) (reducer func(state, action interface{}) (out
 	}
 }
 
-/*
-func CombineReducers2(frs []FieldReducer) Reducer {
-	m := ReducerMap{}
-	m.Add(frs)
+func castToMap(m interface{}) map[string]interface{} {
+	v := reflect.ValueOf(m)
+	return v.Convert(g_tmap).Interface().(map[string]interface{})
+}
 
-	m2 := map[string]Reducer{}
-	for fieldname, reducers := range m {
-		m2[fieldname] = combineReducersArr(reducers...)
-	}
-
-	return func(state, action interface{}) (out interface{}) {
-
-		DBG(">>> combine state=", state, "; action=", action)
-		res := ReducerResult{}
-		if stateres, ok := state.(ReducerResult); ok {
-			res = res.Merge(stateres)
-		} else {
-			res.init(state)
-		}
-		DBG("res=", res)
-
-		for fieldname, reducer := range m2 {
-			DBG("+fieldname=", fieldname)
-			fvalue := getFieldValue(state, fieldname)
-			DBG("fvalue=", fvalue)
-
-			state2 := reducer(fvalue, action)
-			if res2, ok := state2.(ReducerResult); ok {
-				res = res.Merge(res2)
-			} else {
-				res[fieldname] = state2
-			}
-			DBG("-fieldname=", fieldname, " - done")
-		}
-
-		out = res
-		if res.CanFlattenTo(state) {
-			out = res.ToType(state)
-		}
-
-		DBG("<<< combine out=", out)
-
-		return
+// because using
+//        _, ok := v.(map[string]interface[})
+// is not enough
+func assertValidMap(t reflect.Type) {
+	bValid := (t.Kind() == reflect.Map) &&
+		(t.Key().Kind() == reflect.String) &&
+		(t.Elem().Kind() == reflect.Interface)
+	if !bValid {
+		DBG("t.Key()=", t.Key())
+		DBG("t.Elem()=", t.Elem())
+		msgfmt := "Invalid MapReducer: '%v', should be in the form: 'map[string]interface{}'." +
+			"t.Key(): %v, t.Elem(): %v"
+		panic(fmt.Sprintf(msgfmt, t, t.Key(), t.Elem()))
 	}
 }
-*/
+
+func assertValidReducer(tfn reflect.Type) {
+	bValid := (tfn.Kind() == reflect.Func) &&
+		(2 == tfn.NumIn()) &&
+		(1 == tfn.NumOut())
+	if !bValid {
+		msgfmt := "Invalid reducer: '%v', should be in the form: 'func(state, action) (out)'." +
+			"  A redux reducer is a func with 2 arguments."
+		panic(fmt.Sprintf(msgfmt, tfn))
+	}
+}

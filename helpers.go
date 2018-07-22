@@ -31,6 +31,7 @@ func getVField(a interface{}, fieldname string) (b reflect.Value) {
 	return
 }
 
+/*
 func getFieldValue(a interface{}, fieldname string) (b interface{}) {
 	v := reflect.ValueOf(a)
 	for v.Kind() == reflect.Ptr {
@@ -57,7 +58,7 @@ func getFieldValue(a interface{}, fieldname string) (b interface{}) {
 	DBG("getFieldValue out=", b)
 	return
 }
-
+*/
 func isValidField(t reflect.Type, v reflect.Value) (bRet bool) {
 	if (t.Kind() == reflect.Ptr) && v.IsNil() {
 		return
