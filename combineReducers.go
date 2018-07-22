@@ -8,19 +8,21 @@ import (
 type ReducerMap map[string]interface{}
 
 func CombineReducers(fs ...interface{}) (reducer func(state, action interface{}) (out interface{})) {
-	for i, o := range fs {
+	fs2 := []interface{}{}
+	for _, o := range fs {
 		t := reflect.TypeOf(o)
 
 		switch t.Kind() {
 		case reflect.Map:
 			assertValidMap(t)
-			fs[i] = combineMap(castToMap(o))
+			fs2 = append(fs2, combineMap(castToMap(o)))
 		case reflect.Func:
 			assertValidReducer(t)
+			fs2 = append(fs2, o)
 		}
 	}
 
-	return combineReducerArr(fs...)
+	return combineReducerArr(fs2...)
 
 }
 
