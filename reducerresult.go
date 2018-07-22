@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	. "github.com/noypi/util/reflect"
+	"github.com/noypi/util/reflect"
 )
 
 type ReducerResult map[string]interface{}
@@ -64,11 +64,11 @@ func (this ReducerResult) AddMergeField(b ReducerResult, fieldname string) {
 }
 
 func (this ReducerResult) ToType(refType interface{}) interface{} {
-	return FlattenToType(this, refType)
+	return util.FlattenToType(this, refType)
 }
 
 func (this ReducerResult) CanFlattenTo(refType interface{}) (bRet bool) {
-	return CanFlattenTo(this, refType)
+	return util.CanFlattenTo(this, refType)
 }
 
 func (this ReducerResult) Has(k string) bool {

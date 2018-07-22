@@ -8,20 +8,23 @@ import (
 // will ignore nil fields and empty strings
 func merge(a, b interface{}) (c ReducerResult) {
 	DBG("merge in a=", a, "; b=", b)
-	at := reflect.TypeOf(a)
-	av := reflect.ValueOf(a)
+	//	at := reflect.TypeOf(a)
+	//av := reflect.ValueOf(a)
 
 	bt := reflect.TypeOf(b)
 	bv := reflect.ValueOf(b)
 
 	c = ReducerResult{}
-	if (at.Kind() == reflect.Struct) && (bt.Kind() == reflect.Struct) {
+	c.init(a)
+	DBG("merge c:", c)
+	/*if (at.Kind() == reflect.Struct) && (bt.Kind() == reflect.Struct) {
 		for i := 0; i < at.NumField(); i++ {
 			fat := at.Field(i)
 			fav := av.Field(i)
 			if !isValidField(fat.Type, fav) {
 				continue
 			}
+
 			var v interface{} = fav.Interface()
 
 			if _, has := bt.FieldByName(fat.Name); has {
@@ -40,7 +43,7 @@ func merge(a, b interface{}) (c ReducerResult) {
 			}
 			c[fat.Name] = v
 		}
-	}
+	}*/
 
 	if bt.Kind() == reflect.Struct {
 		for i := 0; i < bt.NumField(); i++ {
@@ -49,17 +52,21 @@ func merge(a, b interface{}) (c ReducerResult) {
 			if !isValidField(bat.Type, bav) {
 				continue
 			}
-			if c.Has(bat.Name) {
-				continue
+
+			for bav.Kind() == reflect.Ptr {
+				bav = bav.Elem()
 			}
 			c[bat.Name] = bav.Interface()
 		}
 	}
 
+	DBG("merge result c:", c)
+
 	return
 }
 
 func Merge(a, b interface{}) (out interface{}) {
+	DBGf("Merge a:%T, b:%T", a, b)
 	c := merge(a, b)
 
 	if c.CanFlattenTo(a) {
