@@ -19,7 +19,7 @@ func TestBindCreator_x01(t *testing.T) {
 		result1 = action.(string)
 	}
 
-	fn := BindActionCreator(fnDispatch, fnActionCreator)
+	fn := BindActionCreator(fnActionCreator, fnDispatch)
 
 	assert.Equal("param1 appended newAction", fn("param1"))
 	assert.Equal("param1 appended newAction", result1)

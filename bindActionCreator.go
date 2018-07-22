@@ -4,7 +4,7 @@ import (
 	"reflect"
 )
 
-func BindActionCreator(dispatch func(action interface{}), actionCreatorFunc interface{}) (newActionCreator func(...interface{}) interface{}) {
+func BindActionCreator(actionCreatorFunc interface{}, dispatch func(action interface{})) (newActionCreator func(...interface{}) interface{}) {
 	tfn := reflect.TypeOf(actionCreatorFunc)
 	assertValidActionCreator(tfn)
 	vfn := reflect.ValueOf(actionCreatorFunc)
